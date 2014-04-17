@@ -71,7 +71,7 @@ function wrapper() {
           }
           post.classList.add("handled");
           var report = document.createElement("a");
-          report.innerHTML = "回報蓄意挑釁";
+          report.innerHTML = "回報跳針";
           report.style.color='#5b74a8';
           report.setAttribute("data-key",post.id);
           report.onclick = function(){
