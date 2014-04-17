@@ -9,7 +9,7 @@
   },
   "content_scripts": [ {
       "css": [ ],
-      "js": [  "js/antispike.js" ],
+      "js": [  "js/antispite.js" ],
       "matches": [ "https://www.facebook.com/plugins/comments.php*"],
       "all_frames": true
   }],
