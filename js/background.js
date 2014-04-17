@@ -10,9 +10,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
     if (request.action == "xhttp") {
   
        var url = request.url;
-       var valueObj = request.data;
+       var valueObj = request.data || {};
+       valueObj["ueid"] = chrome.runtime.id;
+
        var method = request.method;
        var cb_ok = callback;
+        function callBackFunction(request,cb_ok,cb_err) {
+            if (request.readyState == 4) {
+               if (request.status == 200) {
+                    cb_ok(request.responseText);
+                } else{
+                    cb_err && cb_err(request.responseText);
+                }
+            }
+            //alert('callback');
+        }
 
        if(url&&valueObj&&method&&cb_ok ){
             var request= new XMLHttpRequest();
@@ -41,7 +53,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
                 request.setRequestHeader("Content-Type",
                             "application/x-www-form-urlencoded");
                 request.onreadystatechange = function(){
-                    callBackFunction(request,cb_ok,cb_err);
+                    callBackFunction(request,cb_ok,null);
                 };
 
                 request.send(requestValue);
@@ -62,7 +74,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
                 request.open("GET", url+"?"+requestValue, true);
 
                 request.onreadystatechange = function(){
-                    callBackFunction(request,cb_ok,cb_err);
+                    callBackFunction(request,cb_ok,null);
                 };
 
                 request.send(null);

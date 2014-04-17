@@ -39,6 +39,8 @@ function wrapper() {
     // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
     // document.getElementsByTagName('body')[0].appendChild(s);
     var handleFBComment = function(){
+        var url = document.querySelector("[name=url]").value;
+
         var analyticsPost = function(post){
             var key = post.id;
             var username = post.querySelector(".profileName").innerHTML;
@@ -53,25 +55,34 @@ function wrapper() {
             var time = parseInt(post.querySelector("abbr").getAttribute("data-utime"),10)*1000;
 
             return {
+              type:"FBComment",
               name:username,
               userkey:userkey,
               content:content,
               time:time,
-              key:key
+              key:key,
+              url:url
             };
         };
 
         var applyoptions = function(post){
+          if(post.classList.contains("handled")){
+            return true;
+          }
+          post.classList.add("handled");
           var report = document.createElement("a");
           report.innerHTML = "回報蓄意挑釁";
           report.style.color='#5b74a8';
           report.setAttribute("data-key",post.id);
           report.onclick = function(){
-            doPost("http://localhost/antispike/index.php/comment/report",
+
+            //doPost("http://localhost/antispike/comment/report",
+            doPost("http://antispite.tonyq.org/comment/report",
               {
                 data:analyticsPost(post)
               },function(){
-                alert("success");
+                report.innerHTML = "已回報";
+                //alert("success");
               });
 
             console.log(analyticsPost(post));
@@ -82,12 +93,12 @@ function wrapper() {
         };
 
       var posts = $$(".fbFeedbackPost");
-      var results = [];
+      //var results = [];
       for(var i = 0 ; i < posts.length;++i){
         applyoptions(posts[i]);
-        results.push(analyticsPost(posts[i]));
+        //results.push(analyticsPost(posts[i]));
       }
-      console.log(JSON.stringify(results));
+      //console.log(JSON.stringify(results));
 
     };
 
@@ -102,6 +113,7 @@ function wrapper() {
     //   }
     // },500);
     handleFBComment();
+    setInterval(handleFBComment,2000);
 
 
   })();
