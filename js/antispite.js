@@ -13,8 +13,8 @@
 
 function wrapper() {
   (function(){
-    //var SERVER = "http://antispite.tonyq.org/";
-    var SERVER = "http://localhost/antispite/";
+    var SERVER = "http://antispite.tonyq.org/";
+    //var SERVER = "http://localhost/antispite/";
 
     var $$ = function(){
         return document.querySelectorAll.apply(document,arguments);
