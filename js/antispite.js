@@ -123,6 +123,7 @@ function wrapper() {
           all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
           users[nowpost.userkey] = users[nowpost.userkey] || []; //init
           users[nowpost.userkey].push(nowpost.key); //push
+          //console.log("add",nowpost.userkey,nowpost.key);
         }
 
       }
@@ -168,7 +169,7 @@ function wrapper() {
                       anti_link.href = SERVER + "comment/user/?key="+encodeURIComponent(user.user);
                       titles.appendChild(anti_link);
                     }else{
-                      anti_link.innerHTML = " 目前跳針指數("+user.count+")";
+                      titles.querySelector(".anti-title").innerHTML = " 使用者跳針指數("+user.count+")";
                     }
                   });
                 });
