@@ -77,16 +77,30 @@ function wrapper() {
           report.setAttribute("data-key",post.id);
           report.classList.add("comment-report");
           report.onclick = function(){
-
-            doPost(SERVER+"comment/report",
+            var more = post.querySelector(".postText .see_more_link");
+            if(more != null){
+              more.click();
+              setTimeout(function(){
+                doPost(SERVER+"comment/report",
+                {
+                  data:analyticsPost(post)
+                },function(){
+                  report.innerHTML = "已回報";
+                  //alert("success");
+                });
+              },1000);
+            }else{
+              doPost(SERVER+"comment/report",
               {
                 data:analyticsPost(post)
               },function(){
                 report.innerHTML = "已回報";
                 //alert("success");
               });
+            }
+            
 
-            console.log(analyticsPost(post));
+            //console.log(analyticsPost(post));
             return false;
           };
           post.querySelector(".action_links").appendChild(document.createTextNode("· "));
@@ -155,7 +169,7 @@ function wrapper() {
 
             }
             //{"isSuccess":true,"errorCode":0,"data":{"bad_posts":[{"_id":"fbc_1474142749482507_322139_1474379669458815"}],"bad_users":[]},"errorMessage":null} 
-            console.log(response);
+            //console.log(response);
           });
       }
       //console.log(JSON.stringify(results));
