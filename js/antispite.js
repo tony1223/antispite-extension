@@ -46,6 +46,9 @@ function wrapper() {
             var key = post.id;
             var username = post.querySelector(".profileName").innerHTML;
             var userkey = post.querySelector(".profileName").href;
+            if(userkey == null){
+              return null;
+            }
             if(userkey.indexOf("profile.php?id=") != -1 ){
               userkey = "id="+userkey.split("id=")[1];
             }else{
@@ -111,8 +114,12 @@ function wrapper() {
       var posts = $$(".fbFeedbackPost");
       var all_post_ids = [];
       for(var i = 0 ; i < posts.length;++i){
-        var nowpost = analyticsPost(posts[i]);
+        var nowpost = analyticsPost(posts[i]);          
+        if(nowpost == null){
+          continue;
+        }
         if(applyoptions(posts[i])){
+
           all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
           users[nowpost.userkey] = users[nowpost.userkey] || []; //init
           users[nowpost.userkey].push(nowpost.key); //push
