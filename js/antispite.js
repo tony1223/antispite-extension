@@ -120,7 +120,7 @@ function wrapper() {
       }
 
       var p = post.parentNode;
-      while(p == null || p.classList.contains("fbFeedbackPost")){ //找上一層的 fbFeedbackPost
+      while(p == null || p.classList.contains("fbFirstPartyPost")){ //找上一層的 fbFeedbackPost
          p = p.parentNode;
       }
       if(p!= null){
@@ -132,7 +132,7 @@ function wrapper() {
 
     var findRelatedUsers = function(post){
       var p = post.parentNode;
-      while(p == null || p.classList.contains("fbFeedbackPost")){ //找上一層的 fbFeedbackPost
+      while(p == null || p.classList.contains("fbFirstPartyPost")){ //找上一層的 fbFeedbackPost
          p = p.parentNode;
       }
 
