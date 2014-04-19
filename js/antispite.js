@@ -80,6 +80,13 @@ function wrapper() {
       report.style.color='#5b74a8';
       report.setAttribute("data-key",post.id);
       report.classList.add("comment-report");
+
+      var link = document.createElement("a");
+      link.innerHTML = "小幫手粉絲頁";
+      link.style.color='#5b74a8';
+      link.href="https://www.facebook.com/pages/跳針留言小幫手/558883377558652";
+      link.target="_blank";
+      
       report.onclick = function(){
         var more = post.querySelector(".postText .see_more_link");
         if(more != null){
@@ -107,8 +114,11 @@ function wrapper() {
         //console.log(analyticsPost(post));
         return false;
       };
-      post.querySelector(".action_links").appendChild(document.createTextNode("· "));
-      post.querySelector(".action_links").appendChild(report);
+      var actions = post.querySelector(".action_links");
+      actions.appendChild(document.createTextNode("· "));
+      actions.appendChild(report);
+      actions.appendChild(document.createTextNode("· "));
+      actions.appendChild(link);
       return true;
     };    
 
