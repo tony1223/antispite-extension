@@ -106,7 +106,8 @@ function wrapper() {
             data:analyticsPost(post,url)
           },function(){
             report.innerHTML = "已回報";
-            //alert("success");
+            actions.appendChild(document.createTextNode("· "));
+            actions.appendChild(link);          
           });
         }
         
@@ -117,8 +118,6 @@ function wrapper() {
       var actions = post.querySelector(".action_links");
       actions.appendChild(document.createTextNode("· "));
       actions.appendChild(report);
-      actions.appendChild(document.createTextNode("· "));
-      actions.appendChild(link);
       return true;
     };    
 
