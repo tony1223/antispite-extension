@@ -46,14 +46,11 @@ function wrapper() {
     var analyticsPost = function(post,url){
         var key = post.id;
         var username = post.querySelector(".profileName").innerHTML;
-        var userkey = post.querySelector(".profileName").href;
+        var profileName = post.querySelector(".profileName");
+        var userkey = findFBUserKeyProfileName(profileName);
+
         if(userkey == null){
           return null;
-        }
-        if(userkey.indexOf("profile.php?id=") != -1 ){
-          userkey = "id="+userkey.split("id=")[1];
-        }else{
-          userkey = userkey.split("www.facebook.com/")[1];
         }
 
         var content = post.querySelector(".postText").innerText;
@@ -139,6 +136,21 @@ function wrapper() {
       return null; //因故找不到回應窗
     };
 
+    var findFBUserKeyProfileName = function(profileName){
+
+      if(profileName.href != null){ //Facebook
+        if(profileName.href.indexOf("profile.php?id=") != -1 ){
+          userkey = "id="+profileName.href.split("id=")[1];
+        }else{
+          userkey = profileName.href.split("www.facebook.com/")[1];
+        }
+      }else if(profileName.nextSibling.innerHTML.indexOf("yahoo") != -1) {  //Yahoo
+        userkey = "yahoo:" + profileName.innerHTML;
+      }
+      return userkey;
+
+    }
+
     var findRelatedUsers = function(post){
       var p = post.parentNode;
       while(p == null || p.classList.contains("fbFirstPartyPost")){ //找上一層的 fbFeedbackPost
@@ -157,16 +169,13 @@ function wrapper() {
 
       for(var i = 0 ; i < posts.length;++i){
         var current = posts[i];
-        var userkey = post.querySelector(".profileName").href;
+        var profileName = post.querySelector(".profileName");
+        var userkey = findFBUserKeyProfileName(profileName);
+
         if(userkey == null){
-          continue;  
+          continue;
         }
 
-        if(userkey.indexOf("profile.php?id=") != -1 ){
-          userkey = "id="+userkey.split("id=")[1];
-        }else{
-          userkey = userkey.split("www.facebook.com/")[1];
-        }
         if(check[userkey] == null){
           users.push(userkey);
         }
