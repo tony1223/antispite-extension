@@ -83,7 +83,8 @@ function wrapper() {
       link.style.color='#5b74a8';
       link.href="https://www.facebook.com/pages/跳針留言小幫手/558883377558652";
       link.target="_blank";
-      
+
+      var actions = post.querySelector(".action_links");
       report.onclick = function(){
         var more = post.querySelector(".postText .see_more_link");
         if(more != null){
@@ -112,7 +113,6 @@ function wrapper() {
         //console.log(analyticsPost(post));
         return false;
       };
-      var actions = post.querySelector(".action_links");
       actions.appendChild(document.createTextNode("· "));
       actions.appendChild(report);
       return true;
@@ -236,6 +236,12 @@ function wrapper() {
                   users[user.user].posts.forEach(function(post_id){
                     var ele = document.getElementById(post_id);
                     var titles = ele.querySelector(".profileName").nextSibling;
+                    if(titles.classList.contains("postContent")){
+                      var newtitle = document.createElement("span");
+                      newtitle.className = "fsm fwn fcg";
+                      titles.parentNode.insertBefore(newtitle,titles);
+                      titles = newtitle;
+                    }
 
                     if(titles.querySelector(".anti-title") == null){
                       var anti_link = document.createElement("a");

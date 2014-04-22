@@ -6,12 +6,31 @@
  *  data  : data to send in a POST request
  *
  * The callback function is called upon completion of the request */
+
+var unique = null;;
+function getUnique(cb){
+    if(unique != null){
+        return cb && cb(unique);
+    }
+    chrome.storage.sync.get({
+        unique: null,
+    }, function(items) {
+        if(items.unique == null){
+            unique = new Date().getTime();
+            chrome.storage.sync.set({'unique': unique});        
+        }else{
+            unique = items.unique;
+        }
+        cb && cb(unique);
+    });
+}
+getUnique();
+
 chrome.runtime.onMessage.addListener(function(request, sender, callback) {
     if (request.action == "xhttp") {
-  
        var url = request.url;
        var valueObj = request.data || {};
-       valueObj["ueid"] = chrome.runtime.id;
+       valueObj["ueid"] = unique;
 
        var method = request.method;
        var cb_ok = callback;
@@ -81,9 +100,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
 
             }
         }else{
-                    alert('<url>,<valueObj>,<method>,<cbfunction>');
+            alert('<url>,<valueObj>,<method>,<cbfunction>');
         }
-        return true; // prevents the callback from being called too early on return
     }
+   
+    return true; // prevents the callback from being called too early on return
+
 
 });

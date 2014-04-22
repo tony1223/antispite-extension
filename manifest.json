@@ -2,15 +2,26 @@
   "name" : "跳針留言小幫手",
   "version" : "1.0.4",
   "description" : "跳針留言小幫手將協助您在閱讀網路上留言時，可以提供跳針標示，並提供使用者回報跳針。更多詳情請參考 http://antispite.tonyq.org 。",
-  "permissions": [ "https://www.facebook.com/plugins/comments.php*","http://antispite.tonyq.org/*","https://antispite.tonyq.org/*" ],
+  "permissions": [ 
+    "https://www.facebook.com/plugins/comments.php*",
+    "http://antispite.tonyq.org/*",
+    "https://antispite.tonyq.org/*",
+    "https://tw.news.yahoo.com/*",
+    "storage"
+  ],
   "browser_action": {
      "default_icon": "icon.png",
      "default_popup": "popup.html"
   },
   "content_scripts": [ {
       "css": [ ],
-      "js": [  "js/antispite.js" ],
+      "js": [  "js/antispite-fb.js" ],
       "matches": [ "https://www.facebook.com/plugins/comments.php*"],
+      "all_frames": true
+  },{
+      "css": [ ],
+      "js": [  "js/antispite-yahoo.js" ],
+      "matches": [ "https://tw.news.yahoo.com/*"],
       "all_frames": true
   }],
   "background": {
