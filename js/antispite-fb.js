@@ -209,7 +209,12 @@ function wrapper() {
         };
         openBtn.innerHTML = "展開全部留言(by小幫手)"
         openBtn.classList.add("open-helper");
-        document.querySelector(".uiHeaderTitle").appendChild(openBtn);
+
+        if (document.querySelector(".uiHeaderTitle") != null){
+          document.querySelector(".uiHeaderTitle").appendChild(openBtn);
+        }else{
+          document.querySelector(".fbFeedbackPosts").parentNode.insertBefore(openBtn,document.querySelector(".fbFeedbackPosts"));
+        }
       }
       //open all implement - end
 
