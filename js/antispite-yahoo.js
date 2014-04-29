@@ -28,12 +28,15 @@ function wrapper() {
         return document.querySelectorAll.apply(document,arguments);
     };
     var ajax = function(url,valueObj,method,cb_ok,cb_err) {
+      console.log(valueObj);
+      /*
       chrome.runtime.sendMessage({
           method: method,
           action: "xhttp",
           data: valueObj,
           url:url
       }, cb_ok);
+*/
        
     };
     var doPost = function(url,valueObj,cb_ok,cb_err){
@@ -98,12 +101,43 @@ function wrapper() {
         }
     };
 
+    var findFirstParent = function(dom,className){
+      var p = dom.parentNode;
+      while(p!= null && !p.classList.contains(className)){
+        p = dom.parentNode;
+      }
+
+      return p;
+    }
+
     var applyoptions = function(post,url){
       if(post.classList.contains("handled") || post.querySelector(".abuse") == null){
         return false;
       }
       post.classList.add("handled");
 
+      /* can't reproduce this so far.
+      var comments = findFirstParent(post,"ugccmt-comments");
+
+      try{
+        if(comments.querySelector("#ugccmt-comment_") != null){ //不在原本的新聞裡
+          var firstLevelPost = findFirstParent(post,"ugccmt-cmt-item") || post;
+          var postMeta = firstLevelPost.previousSibling;
+          while(postMeta != null && !postMeta.id == "ugccmt-comment_" ){
+            postMeta = postMeta.previousSibling;
+          }
+          if(postMeta != null){
+            var postArticle = postMeta.querySelector("ugccmt-article") ;
+            if(postArticle && postArticle.childNodes[0]){
+              var _url = JSON.parse(postArticle.childNodes[0].innerHTML).context_url;
+              url = _url;
+            }
+          }
+        }
+      }catch(ex){
+        console.log("get url fail");
+      }
+      */
 
       // var datetime = new Date(parseInt(post.id.split(/[\-_]/)[2],10));
       // post.querySelector(".ugccmt-timestamp").title = datetime.toString();
