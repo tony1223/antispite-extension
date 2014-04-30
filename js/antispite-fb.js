@@ -186,7 +186,41 @@ function wrapper() {
     };
 
     //===============helpers end ====================
+
+    var open_all = false;
     var handleFBComment = function(){
+      //open all implement - start      
+      if(open_all){
+        var pagers = document.querySelectorAll(".fbFeedbackPagerLink");
+        for(var i = 0; i < pagers.length ;++i){
+          pagers[i].click();
+        }
+      }
+
+      if(document.querySelector(".open-helper") == null){
+        var openBtn = document.createElement("a");
+        openBtn.href='javascript:void 0;';
+        openBtn.onclick = function(){
+          open_all = true;
+          var pagers = document.querySelectorAll(".fbFeedbackPagerLink");
+          for(var i = 0; i < pagers.length ;++i){
+            pagers[i].click();
+          }          
+        };
+        openBtn.innerHTML = "展開全部留言(by小幫手)"
+        openBtn.classList.add("open-helper");
+
+        if (document.querySelector(".uiHeaderTitle") != null){
+          document.querySelector(".uiHeaderTitle").appendChild(openBtn);
+        }else{
+          document.querySelector(".fbFeedbackPosts").parentNode.insertBefore(openBtn,document.querySelector(".fbFeedbackPosts"));
+        }
+      }
+      //open all implement - end
+
+
+
+
       var url = document.querySelector("[name=url]").value;
       var posts = $$(".fbFeedbackPost");
       var all_post_ids = [];
