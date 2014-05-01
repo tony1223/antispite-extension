@@ -28,15 +28,14 @@ function wrapper() {
         return document.querySelectorAll.apply(document,arguments);
     };
     var ajax = function(url,valueObj,method,cb_ok,cb_err) {
-      console.log(valueObj);
-      /*
+      //console.log(valueObj);
+      
       chrome.runtime.sendMessage({
           method: method,
           action: "xhttp",
           data: valueObj,
           url:url
       }, cb_ok);
-*/
        
     };
     var doPost = function(url,valueObj,cb_ok,cb_err){
@@ -103,10 +102,12 @@ function wrapper() {
 
     var findFirstParent = function(dom,className){
       var p = dom.parentNode;
-      while(p!= null && !p.classList.contains(className)){
-        p = dom.parentNode;
+      while(p!= null && p.classList && !p.classList.contains(className)){
+        p = p.parentNode;
       }
-
+      if( p.classList == null){
+        return null;
+      }
       return p;
     }
 
@@ -116,20 +117,20 @@ function wrapper() {
       }
       post.classList.add("handled");
 
-      /* can't reproduce this so far.
+     
       var comments = findFirstParent(post,"ugccmt-comments");
 
       try{
         if(comments.querySelector("#ugccmt-comment_") != null){ //不在原本的新聞裡
           var firstLevelPost = findFirstParent(post,"ugccmt-cmt-item") || post;
           var postMeta = firstLevelPost.previousSibling;
-          while(postMeta != null && !postMeta.id == "ugccmt-comment_" ){
+          while(postMeta != null && postMeta.id != "ugccmt-comment_" ){
             postMeta = postMeta.previousSibling;
           }
           if(postMeta != null){
-            var postArticle = postMeta.querySelector("ugccmt-article") ;
-            if(postArticle && postArticle.childNodes[0]){
-              var _url = JSON.parse(postArticle.childNodes[0].innerHTML).context_url;
+            var postArticle = postMeta.querySelector(".ugccmt-article-title a") ;
+            if(postArticle){
+              var _url = postArticle.href.split(/\?/)[0];
               url = _url;
             }
           }
@@ -137,7 +138,7 @@ function wrapper() {
       }catch(ex){
         console.log("get url fail");
       }
-      */
+      
 
       // var datetime = new Date(parseInt(post.id.split(/[\-_]/)[2],10));
       // post.querySelector(".ugccmt-timestamp").title = datetime.toString();
@@ -283,10 +284,57 @@ function wrapper() {
                   content.style.color ='gray';
                   content.setAttribute("title","跳針內容");
 
+                  var container = content.nextSibling;
+
                   var span = document.createElement("p");
-                  span.style.color="red";
-                  span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。)";
-                  content.appendChild(span);
+                      span.style.color="red";
+                      span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
+                          "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
+                  span.style.margin="8px 0 8px 0";
+                  var ele_elem = container;
+                  ele_elem.parentNode.insertBefore(span,ele_elem);
+
+                  if(post.reply){
+                    var replydiv = document.createElement("div"),
+                        replytitle = document.createElement("div"),
+                        replycontent = document.createElement("div"),
+                        replyurl = document.createElement("a");
+
+                    var replyDate = new Date(post.reply.createDate) ;
+                    var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
+                    var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
+                      "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
+
+
+                    replytitle.style.color="red";
+                    replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
+                    replycontent.innerText = post.reply.content;
+                    replydiv.style.padding = "6px";
+                    replydiv.style.borderRadius = "5px";
+                    replydiv.style.border = "1px solid orange";
+                    replydiv.style.margin="0 0 8px 0";
+                    replydiv.style.lineHeight = "25px";
+
+                    replydiv.appendChild(replytitle);
+                    replydiv.appendChild(replycontent);
+
+                    if(post.reply.url){
+                      replyurl.target = "_blank";
+                      replyurl.href = post.reply.url;
+                      if(post.reply.url_title){
+                        replyurl.innerText = "參考連結: " + post.reply.url_title;
+                      }else{
+                        replyurl.innerText = "參考連結: " + post.reply.url;
+                      }
+                      replyurl.style.textOverflow = "ellipsis";
+                      replyurl.style.width = "433px";
+                      replyurl.style.overflow = "hidden";
+                      replyurl.style.display ="block";
+                      replydiv.appendChild(replyurl);
+                    }
+                    ele_elem.parentNode.insertBefore(replydiv,ele_elem);
+                  }
+
 
                   var report = ele.querySelector(".comment-report");
                   report.parentNode.removeChild(report);

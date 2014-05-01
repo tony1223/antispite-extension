@@ -250,14 +250,59 @@ function wrapper() {
               if(result.data.bad_posts.length){
                 result.data.bad_posts.forEach(function(post){
                   var ele = document.getElementById(post._id);
+
                   var content = ele.querySelector(".postText");
                   content.style.color ='gray';
                   content.setAttribute("title","跳針內容");
 
                   var span = document.createElement("p");
                   span.style.color="red";
-                  span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。)";
-                  content.appendChild(span);
+                  span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
+                      "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
+
+                  var ele_elem = ele.querySelector(".stat_elem");
+                  ele_elem.parentNode.insertBefore(span,ele_elem);
+
+                  if(post.reply){
+                    var replydiv = document.createElement("div"),
+                        replytitle = document.createElement("div"),
+                        replycontent = document.createElement("div"),
+                        replyurl = document.createElement("a");
+
+                    var replyDate = new Date(post.reply.createDate) ;
+                    var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
+                    var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
+                      "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
+
+
+                    replytitle.style.color="red";
+                    replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
+                    replycontent.innerText = post.reply.content;
+                    replydiv.style.padding = "10px";
+                    replydiv.style.borderRadius = "5px";
+                    replydiv.style.border = "1px solid orange";
+                    replydiv.style.margin="0 0 8px 0";
+                    replydiv.style.lineHeight = "25px";
+
+                    replydiv.appendChild(replytitle);
+                    replydiv.appendChild(replycontent);
+
+                    if(post.reply.url){
+                      replyurl.target = "_blank";
+                      replyurl.href = post.reply.url;
+                      if(post.reply.url_title){
+                        replyurl.innerText = "參考連結: " + post.reply.url_title;
+                      }else{
+                        replyurl.innerText = "參考連結: " + post.reply.url;
+                      }
+                      replyurl.style.textOverflow = "ellipsis";
+                      replyurl.style.width = "433px";
+                      replyurl.style.overflow = "hidden";
+                      replyurl.style.display ="block";
+                      replydiv.appendChild(replyurl);
+                    }
+                    ele_elem.parentNode.insertBefore(replydiv,ele_elem);
+                  }
 
                   var report = ele.querySelector(".comment-report");
                   report.parentNode.removeChild(report);
@@ -267,6 +312,11 @@ function wrapper() {
               if(result.data.bad_users.length){
                 result.data.bad_users.forEach(function(user){
                   users[user.user].count = user.count;
+
+                  if(user.count < 5){ //小於五筆的略過不顯示
+                    return true;
+                  }
+
                   users[user.user].posts.forEach(function(post_id){
                     var ele = document.getElementById(post_id);
                     var titles = ele.querySelector(".profileName").nextSibling;
