@@ -20,7 +20,7 @@ function wrapper() {
     // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
     // document.getElementsByTagName('body')[0].appendChild(s);
     var users = {};
-
+    var reportHandlers = {};
 
     //===============helpers start ====================
 
@@ -159,7 +159,11 @@ function wrapper() {
 
       var actions = post.querySelector(".ugccmt-comment-meta");
       report.href="javascript:void 0;";
-      report.onclick = function(){
+      var post_id = post.id;
+      var handler = function(){
+        var post = document.querySelector("#"+post_id);
+        var report = post.querySelector(".comment-report");
+        var actions = post.querySelector(".ugccmt-comment-meta");
         var more = post.querySelector(".ugccmt-commenttext .ugccmt-expand");
         if(more != null){
           more.click();
@@ -184,11 +188,11 @@ function wrapper() {
             actions.appendChild(link);          
           });
         }
-        
-
         //console.log(analyticsPost(post));
         return false;
       };
+      reportHandlers[post.id] = handler;
+
       actions.appendChild(document.createTextNode("· "));
       actions.appendChild(report);
       return true;
@@ -250,6 +254,21 @@ function wrapper() {
     var handleYahooComment = function(){
       if(url == null && document.querySelector("[property=\"og:url\"]") == null){
         return false;
+      }
+
+      if(!document.body.classList.contains("report-comment-handled")){
+        document.body.classList.add("report-comment-handled");
+        document.onclick=function(e){
+          console.log("event",e);
+          try{
+            if(e.target.classList.contains("comment-report")){
+              var key_id = e.target.getAttribute("data-key");
+              reportHandlers[key_id] && reportHandlers[key_id]();
+            }
+          }catch(e){
+            console.log("fail",e);
+          }
+        };
       }
 
       url = url || document.querySelector("[property=\"og:url\"]").content;
