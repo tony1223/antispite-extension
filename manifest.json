@@ -1,6 +1,6 @@
 {
   "name" : "跳針留言小幫手",
-  "version" : "1.0.7",
+  "version" : "1.0.8",
   "description" : "跳針留言小幫手將協助您在閱讀網路上留言時，可以提供跳針標示，並提供使用者回報跳針。更多詳情請參考 http://antispite.tonyq.org 。",
   "permissions": [ 
     "https://www.facebook.com/plugins/comments.php*",
