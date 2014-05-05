@@ -43,7 +43,7 @@ function wrapper() {
         return ajax(url,valueObj,"GET",cb_ok,cb_err);
     };
 
-    var analyticsPost = function(post,url){
+    var analyticsPost = function(post,url,check){
         var key = post.id;
         var username = post.querySelector(".profileName").innerHTML;
         var profileName = post.querySelector(".profileName");
@@ -63,7 +63,8 @@ function wrapper() {
           content:content,
           time:time,
           key:key,
-          url:url
+          url:url,
+          check:check ? "true" : null
         };
     };
 
@@ -373,9 +374,28 @@ function wrapper() {
                     }
                   });
                 });
-
-
               }
+              if(result.data.check_ids.length){
+                result.data.check_ids.forEach(function(post){
+                  var ele = document.getElementById(post);
+                  var more = ele.querySelector(".postText .see_more_link");
+                  if(more != null){
+                    more.click();
+                    setTimeout(function(){
+                      doPost(SERVER+"comment/report_check",
+                      {
+                        data:analyticsPost(ele,url,true)
+                      });
+                    },1000);
+                  }else{
+                    doPost(SERVER+"comment/report_check",
+                    {
+                      data:analyticsPost(ele,url,true)
+                    });
+                  }
+                });
+              }
+
 
             }
             //{"isSuccess":true,"errorCode":0,"data":{"bad_posts":[{"_id":"fbc_1474142749482507_322139_1474379669458815"}],"bad_users":[]},"errorMessage":null} 
