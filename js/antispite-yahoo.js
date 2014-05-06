@@ -134,7 +134,8 @@ function wrapper() {
         console.log("get url fail");
       }
       return new_url;
-    }
+    };
+
     var applyoptions = function(post,url){
       if(post.classList.contains("handled") || post.querySelector(".abuse") == null){
         return false;
