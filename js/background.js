@@ -57,8 +57,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
                     if(requestValue!="") requestValue+="&";
 
                     if(typeof valueObj[i] == "object"){
-                      var content = JSON.stringify(valueObj[i]);
-                      requestValue+=i+"="+content;
+                      var content = encodeURIComponent(JSON.stringify(valueObj[i]));
+                      requestValue+=i+"="+ content;
                       length+= parseInt(content.length);
                     }else{
                       requestValue+=i+"="+escape(valueObj[i]);
@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
                 }
 
                 request.open("POST", url, true);
-                request.setRequestHeader("content-length",length);
+                //request.setRequestHeader("content-length",length);
                 request.setRequestHeader("Content-Type",
                             "application/x-www-form-urlencoded");
                 request.onreadystatechange = function(){
