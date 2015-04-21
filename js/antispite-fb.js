@@ -13,21 +13,76 @@
 
 function wrapper() {
   (function(){
-    var SERVER = "http://antispite.tonyq.org/";
-    //var SERVER = "http://localhost/antispite/";
-
-    // _log("Loading jQuery");
-    // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
-    // document.getElementsByTagName('body')[0].appendChild(s);
-    var users = {};
-
 
     //===============helpers start ====================
 
     var $$ = function(){
         return document.querySelectorAll.apply(document,arguments);
     };
+    var _ajax = function(url,valueObj,method,cb_ok,cb_err){
+      if(url&&valueObj&&method){
+        var request = new XMLHttpRequest();
+
+        if(method=='POST'){
+
+          var requestValue="";
+          var length=0;
+
+          for (var i in valueObj)
+          {
+              if(requestValue!="") requestValue+="&";
+
+              requestValue+=i+"="+escape(valueObj[i]);
+              length+= parseInt(escape(valueObj[i]).length);
+
+          }
+
+          request.open("POST", url, true);
+          request.setRequestHeader("content-length",length);
+          request.setRequestHeader("Content-Type",
+                      "application/x-www-form-urlencoded");
+          request.onreadystatechange = function(){
+              callBackFunction(request,cb_ok,cb_err);
+          };
+
+          request.send(requestValue);
+
+        }else{  // "GET" Mode
+          var requestValue="";
+
+          for (var i in valueObj)
+          {
+              if(requestValue!="") requestValue+="&";
+              requestValue+=i+"="+escape(valueObj[i]);
+          }
+
+          if(requestValue.length>256){
+              alert('長度超過Get上限,無法送出!');
+              return false;
+          }
+          request.open("GET", url+"?"+requestValue, true);
+
+          request.onreadystatechange = function(){
+              if (request.readyState == 4) {
+                 if (request.status == 200) {
+                      cb_ok && cb_ok(request.responseText);
+                  } else{
+                      cb_err && cb_err(request.responseText);
+                  }
+              }
+          };
+
+          request.send(null);
+
+        }
+
+      }else{
+        alert('<url>,<valueObj>,<method>,<cbfunction>');
+      }
+
+    };
     var ajax = function(url,valueObj,method,cb_ok,cb_err) {
+      //_ajax(url,valueObj,method,cb_ok,cb_err);
       chrome.runtime.sendMessage({
           method: method,
           action: "xhttp",
@@ -43,11 +98,37 @@ function wrapper() {
         return ajax(url,valueObj,"GET",cb_ok,cb_err);
     };
 
-    var analyticsPost = function(post,url,check){
+
+    window.IMPL = {
+      users:{},
+      findFBUserKey:function(post){
+        var profileName = post.querySelector(".profileName");
+        if(profileName.href != null){ //Facebook
+          if(profileName.href.indexOf("profile.php?id=") != -1 ){
+            userkey = "id="+profileName.href.split("id=")[1];
+          }else{
+            userkey = profileName.href.split("www.facebook.com/")[1];
+          }
+        }else if(profileName.nextSibling.innerHTML.indexOf("yahoo") != -1) {  //Yahoo
+          userkey = "yahoo:" + profileName.innerHTML;
+        }
+        return userkey;
+
+      },
+      getUrl:function(){
+        return document.querySelector("[name=url]").value;
+      },
+      checkHandled : function(post){
+        if(post.classList.contains("handled")){
+          return true;
+        }
+        return false;
+      },
+      _analyticsPost:function(post,url,check){
         var key = post.id;
         var username = post.querySelector(".profileName").innerHTML;
         var profileName = post.querySelector(".profileName");
-        var userkey = findFBUserKeyProfileName(profileName);
+        var userkey = IMPL.findFBUserKey(post);
 
         if(userkey == null){
           return null;
@@ -56,7 +137,8 @@ function wrapper() {
         var content = post.querySelector(".postText").innerText;
         var time = parseInt(post.querySelector("abbr").getAttribute("data-utime"),10)*1000;
 
-        return {
+
+        var obj = {
           type:"FBComment",
           name:username,
           userkey:userkey,
@@ -66,11 +148,208 @@ function wrapper() {
           url:url,
           check:check ? "true" : null
         };
+        return obj;
+      },
+      analyticsPost:function(post,url,check,callback){
+
+        var more = post.querySelector(".postText .see_more_link");
+        var delay = 0;
+        if(more != null){
+          more.click();
+          delay = 1000;
+          setTimeout(function(){
+            callback && callback(IMPL._analyticsPost(post,url,check));
+          });
+        }else{
+          callback && callback(IMPL._analyticsPost(post,url,check));
+        }
+      },
+      getPosts:function(){
+        return $$(".fbFeedbackPost");
+      },
+      getButtonContainer:function(post){
+        return post.querySelector(".action_links");
+      },
+      analytics_ids:function(posts,url,cb){
+        var all_post_ids = [];
+        var ind = 0 ;
+        var handled = 0 ;
+        for(var i = 0 ; i < posts.length;++i){
+          if(!IMPL.checkHandled(posts[i])){
+            ind++;
+          }
+        }
+        for(var i = 0 ; i < posts.length;++i){
+          if(!IMPL.checkHandled(posts[i])){
+            IMPL.analyticsPost(posts[i],url,null,function(nowpost){
+              handled++;
+              if(nowpost == null){
+                if(handled == ind){
+                  return cb && cb(all_post_ids); 
+                }
+                return true;
+              }
+
+              all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
+              IMPL.users[nowpost.userkey] = IMPL.users[nowpost.userkey] || {name:nowpost.name, posts:[],count:0}; //init
+              IMPL.users[nowpost.userkey].posts.push(nowpost.key); //push
+              //console.log("add",nowpost.userkey,nowpost.key);
+              if(handled == ind){
+                cb && cb(all_post_ids); 
+              }
+            });
+          }
+        }
+      },
+      handledBadPosts:function(bad_posts){
+        if(!bad_posts.length){
+          return true;
+        }
+        // console.log(bad_posts);
+        bad_posts.forEach(function(post){
+          var ele = document.getElementById(post._id);
+
+          var content = ele.querySelector(".postText");
+          content.style.color ='gray';
+          content.setAttribute("title","跳針內容");
+
+          var span = document.createElement("p");
+          span.style.color="red";
+          span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
+              "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
+
+          var ele_elem = ele.querySelector(".stat_elem");
+          ele_elem.parentNode.insertBefore(span,ele_elem);
+
+          if(post.reply){
+            var replydiv = document.createElement("div"),
+                replytitle = document.createElement("div"),
+                replycontent = document.createElement("div"),
+                replyurl = document.createElement("a");
+
+            var replyDate = new Date(post.reply.createDate) ;
+            var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
+            var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
+              "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
+
+
+            replytitle.style.color="red";
+            replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
+            replycontent.innerText = post.reply.content;
+            replydiv.style.padding = "10px";
+            replydiv.style.borderRadius = "5px";
+            replydiv.style.border = "1px solid orange";
+            replydiv.style.margin="0 0 8px 0";
+            replydiv.style.lineHeight = "25px";
+            replydiv.appendChild(replytitle);
+            replydiv.appendChild(replycontent);
+
+            if(post.reply.url){
+              replyurl.target = "_blank";
+              replyurl.href = post.reply.url;
+              if(post.reply.url_title){
+                replyurl.innerText = "參考連結: " + post.reply.url_title;
+              }else{
+                replyurl.innerText = "參考連結: " + post.reply.url;
+              }
+              replyurl.style.textOverflow = "ellipsis";
+              replyurl.style.width = "433px";
+              replyurl.style.overflow = "hidden";
+              replyurl.style.display ="block";
+              replydiv.appendChild(replyurl);
+            }
+            ele_elem.parentNode.insertBefore(replydiv,ele_elem);
+          }
+
+          var report = ele.querySelector(".comment-report");
+          report.parentNode.removeChild(report);
+        });
+      },
+      handledBadUsers:function(bad_users){
+        if(!bad_users.length){
+          return true;
+        }
+        bad_users.forEach(function(user){
+          IMPL.users[user.user].count = user.count;
+
+          if(user.count < 5){ //小於五筆的略過不顯示
+            return true;
+          }
+
+          IMPL.users[user.user].posts.forEach(function(post_id){
+            var ele = document.getElementById(post_id);
+            var titles = ele.querySelector(".profileName").nextSibling;
+            if(titles.classList.contains("postContent")){
+              var newtitle = document.createElement("span");
+              newtitle.className = "fsm fwn fcg";
+              titles.parentNode.insertBefore(newtitle,titles);
+              titles = newtitle;
+            }
+
+            if(titles.querySelector(".anti-title") == null){
+              var anti_link = document.createElement("a");
+              anti_link.style.color='red';
+              anti_link.target="_blank";
+              anti_link.classList.add("anti-title");
+              anti_link.innerHTML = " 使用者跳針指數("+user.count+")";
+              anti_link.href = SERVER + "comment/user/?key="+encodeURIComponent(user.user);
+              titles.appendChild(anti_link);
+            }else{
+              titles.querySelector(".anti-title").innerHTML = " 使用者跳針指數("+user.count+")";
+            }
+
+            var replyText = findReplyComment(ele);
+            if(replyText){
+              var related_users = findRelatedUsers(ele);
+              var reply = [];
+              related_users.forEach(function(user){
+                reply.push(IMPL.users[user].name+" 的跳針指數("+IMPL.users[user].count+"),看看他的留言清單:",
+                    SERVER + "comment/user/?key="+encodeURIComponent(user)
+                );
+              }); 
+              var text = replyText.querySelector("textarea.textInput");
+              if(text){
+                text.classList.add("target-text");
+                //text.value = reply.join("\n");
+              } 
+              var btn = replyText.querySelector(".post .import-btn");
+              if(btn == null){
+                btn = document.createElement("a");
+                btn.classList.add("import-btn");
+                btn.href="javascript:void 0;"
+                btn.innerHTML="引用跳針紀錄(因技術限制需先在留言框先打一個字才能引用)";
+                btn.onclick = function(e){
+                  if(text){
+                    text.value += "\n" + this.getAttribute("data-text");
+                  }
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return false;
+                };
+                replyText.querySelector(".post").appendChild(btn);
+              }
+              btn.setAttribute("data-text",reply.join("\n"));
+            }
+          });
+        }); 
+      }
     };
 
+
+    var SERVER = "http://antispite.tonyq.org/";
+    //var SERVER = "http://localhost/antispite/";
+
+    // _log("Loading jQuery");
+    // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
+    // document.getElementsByTagName('body')[0].appendChild(s);
+    var users = {};
+
+
+
+
     var applyoptions = function(post,url){
-      if(post.classList.contains("handled")){
-        return false;
+      if(IMPL.checkHandled(post)){
+        return true;
       }
       post.classList.add("handled");
       var report = document.createElement("a");
@@ -85,35 +364,22 @@ function wrapper() {
       link.href="https://www.facebook.com/pages/跳針留言小幫手/558883377558652";
       link.target="_blank";
 
-      var actions = post.querySelector(".action_links");
       report.onclick = function(){
-        var more = post.querySelector(".postText .see_more_link");
-        if(more != null){
-          more.click();
-          setTimeout(function(){
-            doPost(SERVER+"comment/report",
-            {
-              data:analyticsPost(post,url)
-            },function(){
-              report.innerHTML = "已回報";
-              //alert("success");
-            });
-          },1000);
-        }else{
+        IMPL.analyticsPost(post,url,null,function(data){
           doPost(SERVER+"comment/report",
           {
-            data:analyticsPost(post,url)
+            data:data
           },function(){
             report.innerHTML = "已回報";
+            var actions = IMPL.getButtonContainer(post);
             actions.appendChild(document.createTextNode("· "));
             actions.appendChild(link);          
           });
-        }
-        
+        });
 
-        //console.log(analyticsPost(post));
         return false;
       };
+      var actions = IMPL.getButtonContainer(post);
       actions.appendChild(document.createTextNode("· "));
       actions.appendChild(report);
       return true;
@@ -137,21 +403,6 @@ function wrapper() {
       return null; //因故找不到回應窗
     };
 
-    var findFBUserKeyProfileName = function(profileName){
-
-      if(profileName.href != null){ //Facebook
-        if(profileName.href.indexOf("profile.php?id=") != -1 ){
-          userkey = "id="+profileName.href.split("id=")[1];
-        }else{
-          userkey = profileName.href.split("www.facebook.com/")[1];
-        }
-      }else if(profileName.nextSibling.innerHTML.indexOf("yahoo") != -1) {  //Yahoo
-        userkey = "yahoo:" + profileName.innerHTML;
-      }
-      return userkey;
-
-    }
-
     var findRelatedUsers = function(post){
       var p = post.parentNode;
       while(p == null || p.classList.contains("fbFirstPartyPost")){ //找上一層的 fbFeedbackPost
@@ -170,8 +421,7 @@ function wrapper() {
 
       for(var i = 0 ; i < posts.length;++i){
         var current = posts[i];
-        var profileName = post.querySelector(".profileName");
-        var userkey = findFBUserKeyProfileName(profileName);
+        var userkey = IMPL.findFBUserKey(post);
 
         if(userkey == null){
           continue;
@@ -220,26 +470,15 @@ function wrapper() {
       //open all implement - end
 
 
+      var url = IMPL.getUrl();
+      var posts = IMPL.getPosts();
 
+      //apply options
 
-      var url = document.querySelector("[name=url]").value;
-      var posts = $$(".fbFeedbackPost");
-      var all_post_ids = [];
-      for(var i = 0 ; i < posts.length;++i){
-        var nowpost = analyticsPost(posts[i],url);          
-        if(nowpost == null){
-          continue;
+      IMPL.analytics_ids(posts,url,function(all_post_ids){
+        if(!all_post_ids.length ){
+          return true;
         }
-        if(applyoptions(posts[i],url)){
-
-          all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
-          users[nowpost.userkey] = users[nowpost.userkey] || {name:nowpost.name, posts:[],count:0}; //init
-          users[nowpost.userkey].posts.push(nowpost.key); //push
-          //console.log("add",nowpost.userkey,nowpost.key);
-        }
-      }
-
-      if(all_post_ids.length){
         doPost(SERVER+"comment/check",
           {
             posts:all_post_ids,
@@ -248,151 +487,18 @@ function wrapper() {
             var result = JSON.parse(response);
             if(result.isSuccess){
               //mark spite result
-              if(result.data.bad_posts.length){
-                result.data.bad_posts.forEach(function(post){
-                  var ele = document.getElementById(post._id);
-
-                  var content = ele.querySelector(".postText");
-                  content.style.color ='gray';
-                  content.setAttribute("title","跳針內容");
-
-                  var span = document.createElement("p");
-                  span.style.color="red";
-                  span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
-                      "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
-
-                  var ele_elem = ele.querySelector(".stat_elem");
-                  ele_elem.parentNode.insertBefore(span,ele_elem);
-
-                  if(post.reply){
-                    var replydiv = document.createElement("div"),
-                        replytitle = document.createElement("div"),
-                        replycontent = document.createElement("div"),
-                        replyurl = document.createElement("a");
-
-                    var replyDate = new Date(post.reply.createDate) ;
-                    var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
-                    var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
-                      "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
-
-
-                    replytitle.style.color="red";
-                    replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
-                    replycontent.innerText = post.reply.content;
-                    replydiv.style.padding = "10px";
-                    replydiv.style.borderRadius = "5px";
-                    replydiv.style.border = "1px solid orange";
-                    replydiv.style.margin="0 0 8px 0";
-                    replydiv.style.lineHeight = "25px";
-
-                    replydiv.appendChild(replytitle);
-                    replydiv.appendChild(replycontent);
-
-                    if(post.reply.url){
-                      replyurl.target = "_blank";
-                      replyurl.href = post.reply.url;
-                      if(post.reply.url_title){
-                        replyurl.innerText = "參考連結: " + post.reply.url_title;
-                      }else{
-                        replyurl.innerText = "參考連結: " + post.reply.url;
-                      }
-                      replyurl.style.textOverflow = "ellipsis";
-                      replyurl.style.width = "433px";
-                      replyurl.style.overflow = "hidden";
-                      replyurl.style.display ="block";
-                      replydiv.appendChild(replyurl);
-                    }
-                    ele_elem.parentNode.insertBefore(replydiv,ele_elem);
-                  }
-
-                  var report = ele.querySelector(".comment-report");
-                  report.parentNode.removeChild(report);
-                });
-              }
-
-              if(result.data.bad_users.length){
-                result.data.bad_users.forEach(function(user){
-                  users[user.user].count = user.count;
-
-                  if(user.count < 5){ //小於五筆的略過不顯示
-                    return true;
-                  }
-
-                  users[user.user].posts.forEach(function(post_id){
-                    var ele = document.getElementById(post_id);
-                    var titles = ele.querySelector(".profileName").nextSibling;
-                    if(titles.classList.contains("postContent")){
-                      var newtitle = document.createElement("span");
-                      newtitle.className = "fsm fwn fcg";
-                      titles.parentNode.insertBefore(newtitle,titles);
-                      titles = newtitle;
-                    }
-
-                    if(titles.querySelector(".anti-title") == null){
-                      var anti_link = document.createElement("a");
-                      anti_link.style.color='red';
-                      anti_link.target="_blank";
-                      anti_link.classList.add("anti-title");
-                      anti_link.innerHTML = " 使用者跳針指數("+user.count+")";
-                      anti_link.href = SERVER + "comment/user/?key="+encodeURIComponent(user.user);
-                      titles.appendChild(anti_link);
-                    }else{
-                      titles.querySelector(".anti-title").innerHTML = " 使用者跳針指數("+user.count+")";
-                    }
-
-                    var replyText = findReplyComment(ele);
-                    if(replyText){
-                      var related_users = findRelatedUsers(ele);
-                      var reply = [];
-                      related_users.forEach(function(user){
-                        reply.push(users[user].name+" 的跳針指數("+users[user].count+"),看看他的留言清單:",
-                            SERVER + "comment/user/?key="+encodeURIComponent(user)
-                        );
-                      }); 
-                      var text = replyText.querySelector("textarea.textInput");
-                      if(text){
-                        text.classList.add("target-text");
-                        //text.value = reply.join("\n");
-                      } 
-                      var btn = replyText.querySelector(".post .import-btn");
-                      if(btn == null){
-                        btn = document.createElement("a");
-                        btn.classList.add("import-btn");
-                        btn.href="javascript:void 0;"
-                        btn.innerHTML="引用跳針紀錄(因技術限制需先在留言框先打一個字才能引用)";
-                        btn.onclick = function(e){
-                          if(text){
-                            text.value += "\n" + this.getAttribute("data-text");
-                          }
-                          e.preventDefault();
-                          e.stopPropagation();
-                          return false;
-                        };
-                        replyText.querySelector(".post").appendChild(btn);
-                      }
-                      btn.setAttribute("data-text",reply.join("\n"));
-                    }
-                  });
-                });
-              }
+              IMPL.handledBadPosts(result.data.bad_posts);
+              IMPL.handledBadUsers(result.data.bad_users);
               if(result.data.check_ids.length){
                 result.data.check_ids.forEach(function(post){
                   var ele = document.getElementById(post);
-                  var more = ele.querySelector(".postText .see_more_link");
-                  if(more != null){
-                    more.click();
-                    setTimeout(function(){
-                      doPost(SERVER+"comment/report_check",
-                      {
-                        data:analyticsPost(ele,url,true)
-                      });
-                    },1000);
-                  }else{
+
+                  IMPL.analyticsPost(ele,url,true,function(d){
                     doPost(SERVER+"comment/report_check",
                     {
-                      data:analyticsPost(ele,url,true)
+                      data:d
                     });
-                  }
+                  });
                 });
               }
 
@@ -400,7 +506,11 @@ function wrapper() {
             }
             //{"isSuccess":true,"errorCode":0,"data":{"bad_posts":[{"_id":"fbc_1474142749482507_322139_1474379669458815"}],"bad_users":[]},"errorMessage":null} 
             //console.log(response);
-          });
+          }
+        );
+      });
+      for(var i = 0 ; i < posts.length;++i){
+        applyoptions(posts[i],url);
       }
       //console.log(JSON.stringify(results));
 
@@ -417,7 +527,7 @@ function wrapper() {
     //   }
     // },500);
     handleFBComment();
-    setInterval(handleFBComment,2000);
+    setInterval(handleFBComment,3000);
 
 
   })();
