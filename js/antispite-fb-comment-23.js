@@ -13,9 +13,37 @@
 
 function wrapper() {
   (function(){
+    var worked = true;
 
+    // var SERVER = "http://antispite.tonyq.org/";
+    var SERVER = "http://localhost:3000/";    
     //===============helpers start ====================
+    var each = function(ary,cb){
+      for(var i = 0; i < ary.length;++i){
+        if(cb){ 
+          var r = cb(ary[i],i);
+          if(r === false){
+            break;
+          }
+        }
+      }
+    };
+    var cut = function(str,start,end){
+      if(str == null ){
+        return null;
+      }
+      var ind = str.indexOf(start);
+      if(ind == -1){
+        return null;
+      }
 
+      var endInd = str.indexOf(end,ind+1);
+      if(endInd == -1){
+        return str.substring(ind+start.length);  
+      }
+      return str.substring(ind+start.length,endInd);
+
+    };
     var $$ = function(){
         return document.querySelectorAll.apply(document,arguments);
     };
@@ -98,11 +126,24 @@ function wrapper() {
         return ajax(url,valueObj,"GET",cb_ok,cb_err);
     };
 
+    var getRid = function(dom){
+      return dom.getAttribute("data-reactid") ;
+    };
+
+    var lchild = function(){
+      var dom = arguments[0];
+      var d = dom;
+      for(var i=1;i<arguments.length && d;++i){
+        d = d.childNodes[arguments[i]];
+      }
+      return d;
+    }
 
     window.IMPL = {
       users:{},
       findFBUserKey:function(post){
-        var profileName = post.querySelector(".profileName");
+        //get user real id
+        var profileName = post.querySelector(".UFICommentActorName");
         if(profileName.href != null){ //Facebook
           if(profileName.href.indexOf("profile.php?id=") != -1 ){
             userkey = "id="+profileName.href.split("id=")[1];
@@ -113,10 +154,39 @@ function wrapper() {
           userkey = "yahoo:" + profileName.innerHTML;
         }
         return userkey;
-
+      },
+      findFBUserID:function(post){
+        var profileName = post.querySelector(".UFICommentActorName");
+        if(profileName != null){ //Facebook
+          var hovercard = profileName.getAttribute("data-hovercard");
+          var fbid = cut(hovercard,"hovercard.php?id=","&");
+          return fbid;
+        }
+        return null;
       },
       getUrl:function(){
-        return document.querySelector("[name=url]").value;
+        //https://www.facebook.com/plugins/comments.php?api_key=350231215126101&channel_url=http%3A%2F%2Fstatic.ak.facebook.com%2Fconnect%2Fxd_arbiter%2FKTWTb9MY5lw.js%3Fversion%3D41%23cb%3Df21a82297%26domain%3Dudn.com%26origin%3Dhttp%253A%252F%252Fudn.com%252Ff3a42af35%26relation%3Dparent.parent&colorscheme=light&href=http://www.appledaily.com.tw/realtimenews/article/new/20150107/538015/&locale=zh_TW&numposts=5&sdk=joey&skin=light&version=v2.3&width=683
+        //console.log(JSON.stringify(self.location.href.toString()));
+        var url = self.location.href.toString();
+        var start = url.indexOf("href=");
+        var data = null;
+        if(start != -1){
+          var end = url.indexOf("&",start+1);
+          if(end == -1){
+            data = url.substring(start+5);
+          }else{
+            data = url.substring(start+5,end);
+          }
+        }
+        if(!data){
+          IMPL.error();
+        }
+        //href=http://www.appledaily.com.tw/realtimenews/article/new/20150107/538015/&
+        return data;
+      },
+      error:function(){
+          worked = false;
+          throw "unkown page of antispite,project stoped.";
       },
       checkHandled : function(post){
         if(post.classList.contains("handled")){
@@ -124,19 +194,89 @@ function wrapper() {
         }
         return false;
       },
+      getPostID:function(post){
+        var key = null,parent_key = null;
+        (function(){
+          var dataid = getRid(post);
+          if(dataid.indexOf(".0.0.2.0") == -1){
+            IMPL.error();
+          }
+          var tokens = dataid.split(/[\$_]/);
+          var id1 = tokens[1];
+          var id2 = tokens[2].substring(0,tokens[2].length-1);
+
+          var utime = lchild(post,1,0,1,0).querySelector(".livetimestamp").getAttribute("data-utime");
+          if(dataid.indexOf("$right") !== -1){
+            parent_key = "fbc2_"+id1+"_"+id2;
+            //fbc_682164288567311_682565851860488_682565851860488_reply
+            key = "fbc2_" + tokens[5]+"_"+ utime +"_reply";
+          }else{
+            key = "fbc2_"+id1+"_"+utime;
+          }
+        })();
+
+        return {key,parent_key:parent_key};
+      },
+      getPostMap:function(){
+        var posts = IMPL.getPosts();
+        var result = {};
+        each(posts,function(p,ind){
+          var data = IMPL.getPostID(p);
+          result[data.key] = p;
+        });
+        return result;
+      },
+      getUserMap:function(){
+        var posts = IMPL.getPosts();
+        var result = {};
+        each(posts,function(p,ind){
+          var data = IMPL.findFBUserKey(p);
+          if(!result[data]){
+            result[data] = [];
+          }
+          result[data].push(p);
+        });
+        return result;
+      },
       _analyticsPost:function(post,url,check){
-        var key = post.id;
-        var username = post.querySelector(".profileName").innerHTML;
-        var profileName = post.querySelector(".profileName");
+        //get_id
+        var key = null,
+            parent_key = null;
+
+        var data = IMPL.getPostID(post);
+        key = data.key;
+        parent_key = data.parent_key;
+
+        if(!key){
+          IMPL.error();
+        }
+
+        var username = post.querySelector(".UFICommentActorName").textContent;
         var userkey = IMPL.findFBUserKey(post);
+        var userid = IMPL.findFBUserID(post);
+
+        var likes = null;
+        var container = lchild(post,1,0,1,0,2);
+        if(container){
+          each(container.querySelectorAll("img"),function(dom){
+            if(dom.src.indexOf("fbfeed/like.png") != -1){
+              likes = dom.nextSibling.textContent;
+              return false;
+            }
+          });
+        }
 
         if(userkey == null){
           return null;
         }
 
-        var content = post.querySelector(".postText").innerText;
-        var time = parseInt(post.querySelector("abbr").getAttribute("data-utime"),10)*1000;
+        // var content = post.querySelectorAll(" div > div ")[1]
+        //   .querySelectorAll(" div > div")[0].textContent;
+        var content = lchild(post,1,0,1,0,1).innerText;
 
+        //livetimestamp
+
+        var time = parseInt(lchild(post,1,0,1,0).querySelector(".livetimestamp").getAttribute("data-utime"),10)*1000;
 
         var obj = {
           type:"FBComment",
@@ -146,13 +286,18 @@ function wrapper() {
           time:time,
           key:key,
           url:url,
-          check:check ? "true" : null
+          check:check ? "true" : null,
+          parent_key:parent_key,
+          fbid:userid,
+          likes:likes,
+          version:"2.3"
         };
+        console.log(obj);
         return obj;
       },
       analyticsPost:function(post,url,check,callback){
 
-        var more = post.querySelector(".postText .see_more_link");
+        var more = null;//TODO: apply this
         var delay = 0;
         if(more != null){
           more.click();
@@ -165,10 +310,36 @@ function wrapper() {
         }
       },
       getPosts:function(){
-        return $$(".fbFeedbackPost");
+        var pager = lchild(document.body,0,0,0,0,2);
+        var posts = [];
+        for(var i = 0 ; i < pager.childNodes.length;++i){
+          var rid = pager.childNodes[i].getAttribute("data-reactid");
+          if(rid.indexOf(".0.0.2.0") !== -1){
+            posts.push(pager.childNodes[i]);
+            [].push.apply(posts,IMPL.getReplyPost(pager.childNodes[i]));
+          }
+        }
+
+        return posts;
+        //return $$(".fbFeedbackPost");
+      },
+      getReplyPost:function(post){
+        var replys = lchild(post,1,0,1,0,3);
+        if(post.querySelector(".spite-info")){
+          replys = lchild(post,1,0,1,0,4);
+        }
+        var result = [];
+        each(replys.childNodes,function(reply,i){
+          var first = lchild(reply,0);
+          if(first && first.tagName == "A"){
+            return true;
+          }
+          result.push(reply);
+        });
+        return result;
       },
       getButtonContainer:function(post){
-        return post.querySelector(".action_links");
+        return lchild(post,1,0,1,0,2);
       },
       analytics_ids:function(posts,url,cb){
         var all_post_ids = [];
@@ -179,9 +350,10 @@ function wrapper() {
             ind++;
           }
         }
-        for(var i = 0 ; i < posts.length;++i){
-          if(!IMPL.checkHandled(posts[i])){
-            IMPL.analyticsPost(posts[i],url,null,function(nowpost){
+
+        each(posts,function(post,i){
+          if(!IMPL.checkHandled(post)){
+            IMPL.analyticsPost(post,url,null,function(nowpost){
               handled++;
               if(nowpost == null){
                 if(handled == ind){
@@ -190,101 +362,106 @@ function wrapper() {
                 return true;
               }
 
-              all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
-              IMPL.users[nowpost.userkey] = IMPL.users[nowpost.userkey] || {name:nowpost.name, posts:[],count:0}; //init
-              IMPL.users[nowpost.userkey].posts.push(nowpost.key); //push
+              all_post_ids.push({
+                key:nowpost.key,
+                type:nowpost.type,
+                user:nowpost.userkey,
+                fbid:nowpost.fbid,
+                time:nowpost.time,
+                likes:nowpost.likes
+              });
               //console.log("add",nowpost.userkey,nowpost.key);
               if(handled == ind){
                 cb && cb(all_post_ids); 
               }
             });
           }
-        }
+        });
       },
       handledBadPosts:function(bad_posts){
         if(!bad_posts.length){
           return true;
         }
+        var postDomMap = IMPL.getPostMap();
         // console.log(bad_posts);
         bad_posts.forEach(function(post){
-          var ele = document.getElementById(post._id);
+          var domPost = postDomMap[post._id];
 
-          var content = ele.querySelector(".postText");
+          var content = lchild(domPost,1,0,1,0,1);
           content.style.color ='gray';
           content.setAttribute("title","跳針內容");
 
           var span = document.createElement("p");
           span.style.color="red";
+          span.className="spite-info";
           span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
-              "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
+              "<a href='" + SERVER + "/comment/provide/?key="+
+                post._id+"' target='_blank'>提供更多資料</a>)";
 
-          var ele_elem = ele.querySelector(".stat_elem");
-          ele_elem.parentNode.insertBefore(span,ele_elem);
+          content.parentNode.insertBefore(span,content.nextSibling);
 
-          if(post.reply){
-            var replydiv = document.createElement("div"),
-                replytitle = document.createElement("div"),
-                replycontent = document.createElement("div"),
-                replyurl = document.createElement("a");
-
-            var replyDate = new Date(post.reply.createDate) ;
-            var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
-            var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
-              "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
-
-
-            replytitle.style.color="red";
-            replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
-            replycontent.innerText = post.reply.content;
-            replydiv.style.padding = "10px";
-            replydiv.style.borderRadius = "5px";
-            replydiv.style.border = "1px solid orange";
-            replydiv.style.margin="0 0 8px 0";
-            replydiv.style.lineHeight = "25px";
-            replydiv.appendChild(replytitle);
-            replydiv.appendChild(replycontent);
-
-            if(post.reply.url){
-              replyurl.target = "_blank";
-              replyurl.href = post.reply.url;
-              if(post.reply.url_title){
-                replyurl.innerText = "參考連結: " + post.reply.url_title;
-              }else{
-                replyurl.innerText = "參考連結: " + post.reply.url;
-              }
-              replyurl.style.textOverflow = "ellipsis";
-              replyurl.style.width = "433px";
-              replyurl.style.overflow = "hidden";
-              replyurl.style.display ="block";
-              replydiv.appendChild(replyurl);
-            }
-            ele_elem.parentNode.insertBefore(replydiv,ele_elem);
-          }
-
-          var report = ele.querySelector(".comment-report");
+          var report = domPost.querySelector(".comment-report");
           report.parentNode.removeChild(report);
         });
+      },
+      getHEAD:function(){
+        var header = document.body.querySelectorAll("body>div>div>div>div>div")[0];
+        if(header && header.childNodes.length == 2 
+            && header.childNodes[0].classList.contains("lfloat")
+            && header.childNodes[1].classList.contains("rfloat")){
+          return header;
+        }
+        return null;
+      },
+      clickPageButton:function(){
+        var pagers = IMPL.getPagerButton();
+        for(var i = 0; i < pagers.length ;++i){
+          if(pagers[i] && !pagers[i].classList.contains("spite-clicked")){
+            pagers[i].click();
+            pagers[i].classList.add("spite-clicked");
+          }
+
+        }
+      },
+      getPagerButton:function(){
+        var pager = document.body.querySelectorAll("body> div>div>div>div>div")[2];
+        var result = [];
+        if(pager && pager.childNodes.length){
+          var lastchild = pager.childNodes[pager.childNodes.length-1];
+          var input = lastchild.querySelector("[type=submit]");
+          if(input){
+            result.push(input);
+          }
+        }
+
+        // var parent = document.body.querySelectorAll("body> div>div>div>div>div")[2];
+        // for(var i = 0 ; i < parent.childNodes.length;++i){
+        //   var replys = lchild(parent.childNodes[i],1,0,1,0,3);
+        //     if(replys){
+        //     var first = lchild(replys.childNodes[replys.childNodes.length-1],0);
+        //     if(first && first.tagName == "A"){
+        //       result.push(first);
+        //     }
+        //   }
+        // }
+        
+
+        return result;
       },
       handledBadUsers:function(bad_users){
         if(!bad_users.length){
           return true;
         }
+        var userDomMap = IMPL.getUserMap();        
         bad_users.forEach(function(user){
-          IMPL.users[user.user].count = user.count;
 
           if(user.count < 5){ //小於五筆的略過不顯示
             return true;
           }
 
-          IMPL.users[user.user].posts.forEach(function(post_id){
-            var ele = document.getElementById(post_id);
-            var titles = ele.querySelector(".profileName").nextSibling;
-            if(titles.classList.contains("postContent")){
-              var newtitle = document.createElement("span");
-              newtitle.className = "fsm fwn fcg";
-              titles.parentNode.insertBefore(newtitle,titles);
-              titles = newtitle;
-            }
+          each(userDomMap[user.user],function(post){
+            var ele = post;
+            var titles = ele.querySelector(".UFICommentActorName").parentNode;
 
             if(titles.querySelector(".anti-title") == null){
               var anti_link = document.createElement("a");
@@ -298,46 +475,11 @@ function wrapper() {
               titles.querySelector(".anti-title").innerHTML = " 使用者跳針指數("+user.count+")";
             }
 
-            var replyText = findReplyComment(ele);
-            if(replyText){
-              var related_users = findRelatedUsers(ele);
-              var reply = [];
-              related_users.forEach(function(user){
-                reply.push(IMPL.users[user].name+" 的跳針指數("+IMPL.users[user].count+"),看看他的留言清單:",
-                    SERVER + "comment/user/?key="+encodeURIComponent(user)
-                );
-              }); 
-              var text = replyText.querySelector("textarea.textInput");
-              if(text){
-                text.classList.add("target-text");
-                //text.value = reply.join("\n");
-              } 
-              var btn = replyText.querySelector(".post .import-btn");
-              if(btn == null){
-                btn = document.createElement("a");
-                btn.classList.add("import-btn");
-                btn.href="javascript:void 0;"
-                btn.innerHTML="引用跳針紀錄(因技術限制需先在留言框先打一個字才能引用)";
-                btn.onclick = function(e){
-                  if(text){
-                    text.value += "\n" + this.getAttribute("data-text");
-                  }
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return false;
-                };
-                replyText.querySelector(".post").appendChild(btn);
-              }
-              btn.setAttribute("data-text",reply.join("\n"));
-            }
           });
         }); 
       }
     };
 
-
-    var SERVER = "http://antispite.tonyq.org/";
-    //var SERVER = "http://localhost/antispite/";
 
     // _log("Loading jQuery");
     // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
@@ -439,13 +581,14 @@ function wrapper() {
     //===============helpers end ====================
 
     var open_all = false;
+
     var handleFBComment = function(){
+      if(!worked){
+        return true;
+      }
       //open all implement - start      
       if(open_all){
-        var pagers = document.querySelectorAll(".fbFeedbackPagerLink");
-        for(var i = 0; i < pagers.length ;++i){
-          pagers[i].click();
-        }
+        IMPL.clickPageButton();
       }
 
       if(document.querySelector(".open-helper") == null){
@@ -453,18 +596,14 @@ function wrapper() {
         openBtn.href='javascript:void 0;';
         openBtn.onclick = function(){
           open_all = true;
-          var pagers = document.querySelectorAll(".fbFeedbackPagerLink");
-          for(var i = 0; i < pagers.length ;++i){
-            pagers[i].click();
-          }          
+          IMPL.clickPageButton();
         };
         openBtn.innerHTML = "展開全部留言(by小幫手)"
         openBtn.classList.add("open-helper");
 
-        if (document.querySelector(".uiHeaderTitle") != null){
-          document.querySelector(".uiHeaderTitle").appendChild(openBtn);
-        }else{
-          document.querySelector(".fbFeedbackPosts").parentNode.insertBefore(openBtn,document.querySelector(".fbFeedbackPosts"));
+        var header = IMPL.getHEAD();
+        if(header){
+          header.childNodes[0].appendChild(openBtn);
         }
       }
       //open all implement - end
@@ -479,7 +618,7 @@ function wrapper() {
         if(!all_post_ids.length ){
           return true;
         }
-        doPost(SERVER+"comment/check",
+        doPost(SERVER+"comment/checkv2",
           {
             posts:all_post_ids,
             url:url
@@ -489,18 +628,17 @@ function wrapper() {
               //mark spite result
               IMPL.handledBadPosts(result.data.bad_posts);
               IMPL.handledBadUsers(result.data.bad_users);
-              if(result.data.check_ids.length){
-                result.data.check_ids.forEach(function(post){
-                  var ele = document.getElementById(post);
-
-                  IMPL.analyticsPost(ele,url,true,function(d){
-                    doPost(SERVER+"comment/report_check",
-                    {
-                      data:d
-                    });
-                  });
-                });
-              }
+              // if(result.data.check_ids.length){
+              //   result.data.check_ids.forEach(function(post){
+              //     var ele = document.getElementById(post);
+              //     IMPL.analyticsPost(ele,url,true,function(d){
+              //       doPost(SERVER+"comment/report_check",
+              //       {
+              //         data:d
+              //       });
+              //     });
+              //   });
+              // }
 
 
             }
@@ -509,9 +647,10 @@ function wrapper() {
           }
         );
       });
-      for(var i = 0 ; i < posts.length;++i){
-        applyoptions(posts[i],url);
-      }
+
+      each(posts,function(p,i){
+        applyoptions(p,url);
+      });
       //console.log(JSON.stringify(results));
 
     };

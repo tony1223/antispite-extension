@@ -13,7 +13,12 @@
   ],
   "content_scripts": [ {
       "css": [ ],
-      "js": [  "js/antispite-fb.js" ],
+      "js": [  "js/antispite-fb-comment-23.js" ],
+      "matches": [ "https://www.facebook.com/plugins/comments.php*version=v2.3*"],
+      "all_frames": true
+  },{
+      "css": [ ],
+      "js": [  "js/antispite-fb-comment.js" ],
       "matches": [ "https://www.facebook.com/plugins/comments.php*"],
       "all_frames": true
   },{
