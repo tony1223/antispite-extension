@@ -17,6 +17,9 @@ function wrapper() {
       //alert("not supported v2.3");
       return true;
     }
+
+    var SERVER = "http://antispite.tonyq.org/";
+    // var SERVER = "http://localhost:3000/";    
     //===============helpers start ====================
 
     var $$ = function(){
@@ -137,9 +140,37 @@ function wrapper() {
           return null;
         }
 
-        var content = post.querySelector(".postText").innerText;
-        var time = parseInt(post.querySelector("abbr").getAttribute("data-utime"),10)*1000;
+        var parent_key = null;
+        var p = post.parentNode;
+        
+        var utime = post.querySelector("abbr").getAttribute("data-utime");
+        var time = parseInt(utime,10)*1000;
+        var fbkey = null;
+        if(key.indexOf("reply") !== -1){ //reply
+          fbkey = "fbc2_"+key.split("_")[2]+"_"+utime +"_reply";
+        }else{
+          fbkey = "fbc2_"+key.split("_")[1]+"_"+utime ;
+        }
 
+        if(key.indexOf("reply") !== -1){
+          while(p){
+            if(p.classList.contains("fbFeedbackPost")){
+              var parent_post_data = IMPL._analyticsPost(p);
+              parent_key = parent_post_data.fbkey;
+
+              break;
+            }
+            p = p.parentNode;
+          }
+        }
+
+        var content = post.querySelector(".postText").innerText;
+        var likes = 0;
+
+        var likedom = post.querySelectorAll(".postBlingBox")[0];
+        if(likedom ){
+          likes = likedom.textContent;
+        }
 
         var obj = {
           type:"FBComment",
@@ -149,7 +180,12 @@ function wrapper() {
           time:time,
           key:key,
           url:url,
-          check:check ? "true" : null
+          check:check ? "true" : null,
+          parent_key:parent_key,
+          fbkey:fbkey,
+          //fbid:userid,
+          likes:likes,
+          version:"1.0"
         };
         return obj;
       },
@@ -193,7 +229,13 @@ function wrapper() {
                 return true;
               }
 
-              all_post_ids.push({key:nowpost.key,type:nowpost.type,user:nowpost.userkey});
+              all_post_ids.push({
+                key:nowpost.key,
+                type:nowpost.type,
+                user:nowpost.userkey,
+                time:nowpost.time,
+                likes:nowpost.likes
+              });
               IMPL.users[nowpost.userkey] = IMPL.users[nowpost.userkey] || {name:nowpost.name, posts:[],count:0}; //init
               IMPL.users[nowpost.userkey].posts.push(nowpost.key); //push
               //console.log("add",nowpost.userkey,nowpost.key);
@@ -315,32 +357,12 @@ function wrapper() {
                 text.classList.add("target-text");
                 //text.value = reply.join("\n");
               } 
-              var btn = replyText.querySelector(".post .import-btn");
-              if(btn == null){
-                btn = document.createElement("a");
-                btn.classList.add("import-btn");
-                btn.href="javascript:void 0;"
-                btn.innerHTML="引用跳針紀錄(因技術限制需先在留言框先打一個字才能引用)";
-                btn.onclick = function(e){
-                  if(text){
-                    text.value += "\n" + this.getAttribute("data-text");
-                  }
-                  e.preventDefault();
-                  e.stopPropagation();
-                  return false;
-                };
-                replyText.querySelector(".post").appendChild(btn);
-              }
-              btn.setAttribute("data-text",reply.join("\n"));
+       
             }
           });
         }); 
       }
     };
-
-
-    var SERVER = "http://antispite.tonyq.org/";
-    //var SERVER = "http://localhost/antispite/";
 
     // _log("Loading jQuery");
     // var s=document.createElement('script');s.setAttribute('src', 'https://code.jquery.com/jquery.js');
@@ -482,7 +504,7 @@ function wrapper() {
         if(!all_post_ids.length ){
           return true;
         }
-        doPost(SERVER+"comment/check",
+        doPost(SERVER+"comment/checkv2",
           {
             posts:all_post_ids,
             url:url
@@ -493,14 +515,19 @@ function wrapper() {
               IMPL.handledBadPosts(result.data.bad_posts);
               IMPL.handledBadUsers(result.data.bad_users);
               if(result.data.check_ids.length){
+                var reports = [];  
                 result.data.check_ids.forEach(function(post){
                   var ele = document.getElementById(post);
-
                   IMPL.analyticsPost(ele,url,true,function(d){
-                    doPost(SERVER+"comment/report_check",
-                    {
-                      data:d
-                    });
+                    reports.push(d);
+
+                    if(reports.length == result.data.check_ids.length){
+                      doPost(SERVER+"comment/report_check",
+                      {
+                        data:reports
+                      });
+                    }
+                    
                   });
                 });
               }

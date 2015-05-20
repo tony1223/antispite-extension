@@ -15,8 +15,8 @@ function wrapper() {
   (function(){
     var worked = true;
 
-    // var SERVER = "http://antispite.tonyq.org/";
-    var SERVER = "http://localhost:3000/";    
+    var SERVER = "http://antispite.tonyq.org/";
+    // var SERVER = "http://localhost:3000/";    
     //===============helpers start ====================
     var each = function(ary,cb){
       for(var i = 0; i < ary.length;++i){
@@ -137,6 +137,14 @@ function wrapper() {
         d = d.childNodes[arguments[i]];
       }
       return d;
+    };
+    var lparent = function(post,level){
+      var dom = post;
+      var d = dom;
+      for(var i= 0 ;i < level && d;++i){
+        d = d.parentNode;
+      }
+      return d;
     }
 
     window.IMPL = {
@@ -207,7 +215,8 @@ function wrapper() {
 
           var utime = lchild(post,1,0,1,0).querySelector(".livetimestamp").getAttribute("data-utime");
           if(dataid.indexOf("$right") !== -1){
-            parent_key = "fbc2_"+id1+"_"+id2;
+            var parent_post = lparent(post,6);
+            parent_key = IMPL.getPostID(parent_post);
             //fbc_682164288567311_682565851860488_682565851860488_reply
             key = "fbc2_" + tokens[5]+"_"+ utime +"_reply";
           }else{
@@ -292,7 +301,6 @@ function wrapper() {
           likes:likes,
           version:"2.3"
         };
-        console.log(obj);
         return obj;
       },
       analyticsPost:function(post,url,check,callback){
