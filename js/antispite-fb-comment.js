@@ -19,7 +19,7 @@ function wrapper() {
     }
 
     var SERVER = "http://antispite.tonyq.org/";
-    // var SERVER = "http://localhost:3000/";    
+     // var SERVER = "http://localhost:9090/";    
     //===============helpers start ====================
 
     var $$ = function(){

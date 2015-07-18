@@ -61,8 +61,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
                       requestValue+=i+"="+ content;
                       length+= parseInt(content.length);
                     }else{
-                      requestValue+=i+"="+escape(valueObj[i]);
-                      length+= parseInt(escape(valueObj[i]).length);
+                      requestValue+=i+"="+encodeURIComponent(valueObj[i]);
+                      length+= parseInt(encodeURIComponent(valueObj[i]).length);
                     }
 
                 }

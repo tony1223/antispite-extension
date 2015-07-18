@@ -37,7 +37,7 @@ function wrapper() {
         return null;
       }
 
-      var endInd = str.indexOf(end,ind+1);
+      var endInd = str.indexOf(end,ind + start.length +1);
       if(endInd == -1){
         return str.substring(ind+start.length);  
       }
@@ -318,7 +318,8 @@ function wrapper() {
         }
       },
       getPosts:function(){
-        var pager = lchild(document.body,0,0,0,0,2);
+        var pager = document.querySelectorAll("[data-reactid='.0.0.2']")[0];
+        //lchild(document.body,0,0,0,0,2);
         var posts = [];
         for(var i = 0 ; i < pager.childNodes.length;++i){
           var rid = pager.childNodes[i].getAttribute("data-reactid");
