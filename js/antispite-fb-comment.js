@@ -18,6 +18,7 @@ function wrapper() {
       return true;
     }
 
+    var log = false;
     var SERVER = "http://antispite.tonyq.org/";
      // var SERVER = "http://localhost:9090/";    
     //===============helpers start ====================
@@ -105,15 +106,26 @@ function wrapper() {
     };
 
 
+    var w = function(ary){
+      var o = [];
+      for(var i = 0 ; i < ary.length;++i){
+        o.push(ary[i]);
+      }
+      return o;
+    };
+
     window.IMPL = {
       users:{},
       findFBUserKey:function(post){
-        var profileName = post.querySelector(".profileName");
+        var profileName = post.querySelector(".UFICommentActorName");
         if(profileName.href != null){ //Facebook
           if(profileName.href.indexOf("profile.php?id=") != -1 ){
             userkey = "id="+profileName.href.split("id=")[1];
           }else{
             userkey = profileName.href.split("www.facebook.com/")[1];
+            if(userkey.indexOf("-")){
+              userkey = userkey.split("-")[userkey.split("-").length-1];
+            }
           }
         }else if(profileName.nextSibling.innerHTML.indexOf("yahoo") != -1) {  //Yahoo
           userkey = "yahoo:" + profileName.innerHTML;
@@ -122,7 +134,10 @@ function wrapper() {
 
       },
       getUrl:function(){
-        return document.querySelector("[name=url]").value;
+        var u = self.location.href.toString();
+        u = u.substring(u.indexOf("href=")+4,u.indexOf("&",u.indexOf("href=")));
+        // console.log("URL",decodeURIComponent(u));
+        return decodeURIComponent(u);
       },
       checkHandled : function(post){
         if(post.classList.contains("handled")){
@@ -130,10 +145,40 @@ function wrapper() {
         }
         return false;
       },
+      getPostKey:function(post){
+        if(post == null){
+          return null;
+        }
+        if(post.querySelectorAll(".uiLinkSubtle")[0]){
+          return post.querySelectorAll(".uiLinkSubtle")[0].href.split("fb_comment_id=")[1];
+        }
+        return IMPL.getPostKey(IMPL.getParentPost(post)) + "_"+ post.querySelector("abbr").getAttribute("data-utime");
+      },
+      getParentPost:function(post){
+        var p = post;
+        while(p){
+          if(p.classList.contains("UFIImageBlockContent")){
+            return p.parentNode.parentNode;
+          }
+          p = p.parentNode;
+        }
+      },
+      getContentDOM:function(post){
+        return post.querySelector(".uiLinkSubtle,.livetimestamp").parentNode.parentNode.previousSibling;
+      },
       _analyticsPost:function(post,url,check){
-        var key = post.id;
-        var username = post.querySelector(".profileName").innerHTML;
-        var profileName = post.querySelector(".profileName");
+
+
+        var key = IMPL.getPostKey(post);
+        var reply = false;
+        if(key.split("_").length >=3){
+          parent_key = IMPL.getPostKey(IMPL.getParentPost(post)) ;
+          reply = true;
+        }
+
+        log && console.log("post keys:"+key,parent_key);
+
+        var username = post.querySelector(".UFICommentActorName").innerHTML;
         var userkey = IMPL.findFBUserKey(post);
 
         if(userkey == null){
@@ -146,31 +191,23 @@ function wrapper() {
         var utime = post.querySelector("abbr").getAttribute("data-utime");
         var time = parseInt(utime,10)*1000;
         var fbkey = null;
-        if(key.indexOf("reply") !== -1){ //reply
-          fbkey = "fbc2_"+key.split("_")[2]+"_"+utime +"_reply";
+        if(reply){ //reply
+          fbkey = "fbc2_"+key.split("_")[1]+"_"+utime +"_reply";
         }else{
           fbkey = "fbc2_"+key.split("_")[1]+"_"+utime ;
         }
 
-        if(key.indexOf("reply") !== -1){
-          while(p){
-            if(p.classList.contains("fbFeedbackPost")){
-              var parent_post_data = IMPL._analyticsPost(p);
-              parent_key = parent_post_data.fbkey;
 
-              break;
-            }
-            p = p.parentNode;
-          }
-        }
-
-        var content = post.querySelector(".postText").innerText;
+        var content = IMPL.getContentDOM(post).innerText;
         var likes = 0;
 
-        var likedom = post.querySelectorAll(".postBlingBox")[0];
-        if(likedom ){
-          likes = likedom.textContent;
-        }
+        var likedom = w(post.querySelector(".uiLinkSubtle,.livetimestamp").parentNode.parentNode.querySelectorAll("img"));
+        
+        likedom.filter(function(img){
+          return img.src.indexOf("like.png") != -1;
+        }).forEach(function(o){
+          likes = o.nextSibling.textContent;
+        });
 
         var obj = {
           type:"FBComment",
@@ -204,10 +241,14 @@ function wrapper() {
         }
       },
       getPosts:function(){
-        return $$(".fbFeedbackPost");
+        return w(document.querySelectorAll(".UFIImageBlockContent")).filter(function(o){
+          return o.classList.contains("clearfix");
+        }).map(function(o){
+          return o.parentNode.parentNode;
+        });
       },
       getButtonContainer:function(post){
-        return post.querySelector(".action_links");
+        return post.querySelector(".uiLinkSubtle,.livetimestamp").parentNode.parentNode;
       },
       analytics_ids:function(posts,url,cb){
         var all_post_ids = [];
@@ -246,74 +287,45 @@ function wrapper() {
           }
         }
       },
+      getPostMap:function(){
+        return IMPL.getPosts().reduce(function(now,p){
+          now[IMPL.getPostKey(p)] = p;
+          return now;
+        },{});
+      },
       handledBadPosts:function(bad_posts){
         if(!bad_posts.length){
           return true;
         }
         // console.log(bad_posts);
+        var postMap = IMPL.getPostMap();
         bad_posts.forEach(function(post){
-          var ele = document.getElementById(post._id);
+          var ele = postMap[post._id];
 
-          var content = ele.querySelector(".postText");
+          var content = IMPL.getContentDOM(ele).childNodes[0];
           content.style.color ='gray';
           content.setAttribute("title","跳針內容");
 
           var span = document.createElement("p");
           span.style.color="red";
-          span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。"+
-              "<a href='" + SERVER + "/comment/provide/?key="+post._id+"' target='_blank'>提供更多資料</a>)";
+          span.innerHTML="(反跳針偵測：注意，此篇可能有跳針內容。)";
 
-          var ele_elem = ele.querySelector(".stat_elem");
-          ele_elem.parentNode.insertBefore(span,ele_elem);
-
-          if(post.reply){
-            var replydiv = document.createElement("div"),
-                replytitle = document.createElement("div"),
-                replycontent = document.createElement("div"),
-                replyurl = document.createElement("a");
-
-            var replyDate = new Date(post.reply.createDate) ;
-            var paddingZero = function(num){ return num < 10 ? "0"+num : num;}
-            var replyText = replyDate.getFullYear() + "/" + paddingZero(replyDate.getMonth()+1) +
-              "/" + paddingZero(replyDate.getDate()) +" " + paddingZero(replyDate.getHours())+":"+ paddingZero(replyDate.getMinutes());
-
-
-            replytitle.style.color="red";
-            replytitle.innerHTML = "小幫手的網友於 " + replyText + " 提供：" ;
-            replycontent.innerText = post.reply.content;
-            replydiv.style.padding = "10px";
-            replydiv.style.borderRadius = "5px";
-            replydiv.style.border = "1px solid orange";
-            replydiv.style.margin="0 0 8px 0";
-            replydiv.style.lineHeight = "25px";
-            replydiv.appendChild(replytitle);
-            replydiv.appendChild(replycontent);
-
-            if(post.reply.url){
-              replyurl.target = "_blank";
-              replyurl.href = post.reply.url;
-              if(post.reply.url_title){
-                replyurl.innerText = "參考連結: " + post.reply.url_title;
-              }else{
-                replyurl.innerText = "參考連結: " + post.reply.url;
-              }
-              replyurl.style.textOverflow = "ellipsis";
-              replyurl.style.width = "433px";
-              replyurl.style.overflow = "hidden";
-              replyurl.style.display ="block";
-              replydiv.appendChild(replyurl);
-            }
-            ele_elem.parentNode.insertBefore(replydiv,ele_elem);
-          }
+          var ele_elem = IMPL.getContentDOM(ele);
+          ele_elem.appendChild(span,ele_elem);
 
           var report = ele.querySelector(".comment-report");
           report.parentNode.removeChild(report);
         });
       },
+      getProfileContainer:function(post){
+        return post.querySelector(".UFICommentActorName").parentNode;
+      },
       handledBadUsers:function(bad_users){
         if(!bad_users.length){
           return true;
         }
+
+        var postMap = IMPL.getPostMap();
         bad_users.forEach(function(user){
           IMPL.users[user.user].count = user.count;
 
@@ -322,14 +334,14 @@ function wrapper() {
           }
 
           IMPL.users[user.user].posts.forEach(function(post_id){
-            var ele = document.getElementById(post_id);
-            var titles = ele.querySelector(".profileName").nextSibling;
-            if(titles.classList.contains("postContent")){
-              var newtitle = document.createElement("span");
-              newtitle.className = "fsm fwn fcg";
-              titles.parentNode.insertBefore(newtitle,titles);
-              titles = newtitle;
-            }
+            var ele = postMap[post_id];
+            var titles = IMPL.getProfileContainer(ele);
+            // if(titles.classList.contains("postContent")){
+            //   var newtitle = document.createElement("span");
+            //   newtitle.className = "fsm fwn fcg";
+            //   titles.parentNode.insertBefore(newtitle,titles);
+            //   titles = newtitle;
+            // }
 
             if(titles.querySelector(".anti-title") == null){
               var anti_link = document.createElement("a");
@@ -343,22 +355,22 @@ function wrapper() {
               titles.querySelector(".anti-title").innerHTML = " 使用者跳針指數("+user.count+")";
             }
 
-            var replyText = findReplyComment(ele);
-            if(replyText){
-              var related_users = findRelatedUsers(ele);
-              var reply = [];
-              related_users.forEach(function(user){
-                reply.push(IMPL.users[user].name+" 的跳針指數("+IMPL.users[user].count+"),看看他的留言清單:",
-                    SERVER + "comment/user/?key="+encodeURIComponent(user)
-                );
-              }); 
-              var text = replyText.querySelector("textarea.textInput");
-              if(text){
-                text.classList.add("target-text");
-                //text.value = reply.join("\n");
-              } 
+            // var replyText = findReplyComment(ele);
+            // if(replyText){
+            //   var related_users = findRelatedUsers(ele);
+            //   var reply = [];
+            //   related_users.forEach(function(user){
+            //     reply.push(IMPL.users[user].name+" 的跳針指數("+IMPL.users[user].count+"),看看他的留言清單:",
+            //         SERVER + "comment/user/?key="+encodeURIComponent(user)
+            //     );
+            //   }); 
+            //   var text = replyText.querySelector("textarea.textInput");
+            //   if(text){
+            //     text.classList.add("target-text");
+            //     //text.value = reply.join("\n");
+            //   } 
        
-            }
+            // }
           });
         }); 
       }
@@ -462,7 +474,11 @@ function wrapper() {
     };
 
     //===============helpers end ====================
-
+    log && console.log("antispite test for normal ...");
+    if(document.querySelectorAll(".UFIImageBlockContent").length == 0){
+      throw "antispite not support (normal version)";
+      return true;
+    }
     var open_all = false;
     var handleFBComment = function(){
       //open all implement - start      
@@ -489,7 +505,7 @@ function wrapper() {
         if (document.querySelector(".uiHeaderTitle") != null){
           document.querySelector(".uiHeaderTitle").appendChild(openBtn);
         }else{
-          document.querySelector(".fbFeedbackPosts").parentNode.insertBefore(openBtn,document.querySelector(".fbFeedbackPosts"));
+          document.querySelector(".UFIImageBlockContent").parentNode.parentNode.parentNode.insertBefore(openBtn,document.querySelector(".fbFeedbackPosts"));
         }
       }
       //open all implement - end
@@ -514,6 +530,7 @@ function wrapper() {
               //mark spite result
               IMPL.handledBadPosts(result.data.bad_posts);
               IMPL.handledBadUsers(result.data.bad_users);
+
               if(result.data.check_ids.length){
                 var reports = [];  
                 result.data.check_ids.forEach(function(post){

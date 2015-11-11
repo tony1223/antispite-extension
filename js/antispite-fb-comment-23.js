@@ -14,6 +14,7 @@
 function wrapper() {
   (function(){
     var worked = true;
+    var log = false;
 
     var SERVER = "http://antispite.tonyq.org/";
     // var SERVER = "http://localhost:3000/";    
@@ -147,7 +148,7 @@ function wrapper() {
       return d;
     }
 
-    window.IMPL = {
+    var IMPL = {
       users:{},
       findFBUserKey:function(post){
         //get user real id
@@ -305,9 +306,9 @@ function wrapper() {
       },
       analyticsPost:function(post,url,check,callback){
 
-        var more = null;//TODO: apply this
+        var more = post.querySelector('[role="button"]');//TODO: apply this
         var delay = 0;
-        if(more != null){
+        if(more != null && more.textContent.indexOf("查看更多") != -1){
           more.click();
           delay = 1000;
           setTimeout(function(){
@@ -319,6 +320,9 @@ function wrapper() {
       },
       getPosts:function(){
         var pager = document.querySelectorAll("[data-reactid='.0.0.2']")[0];
+        if(pager == null){
+          throw "unsupported comment for v2.3";
+        }
         //lchild(document.body,0,0,0,0,2);
         var posts = [];
         for(var i = 0 ; i < pager.childNodes.length;++i){
@@ -334,7 +338,8 @@ function wrapper() {
       },
       getReplyPost:function(post){
         var replys = lchild(post,1,0,1,0,3);
-        if(post.querySelector(".spite-info")){
+        // if(post.querySelector(".spite-info")){
+        if(lchild(post,1,0,1,0,4) != null){
           replys = lchild(post,1,0,1,0,4);
         }
         var result = [];
@@ -637,17 +642,19 @@ function wrapper() {
               //mark spite result
               IMPL.handledBadPosts(result.data.bad_posts);
               IMPL.handledBadUsers(result.data.bad_users);
-              // if(result.data.check_ids.length){
-              //   result.data.check_ids.forEach(function(post){
-              //     var ele = document.getElementById(post);
-              //     IMPL.analyticsPost(ele,url,true,function(d){
-              //       doPost(SERVER+"comment/report_check",
-              //       {
-              //         data:d
-              //       });
-              //     });
-              //   });
-              // }
+              if(result.data.check_ids.length){
+                var postDomMap = IMPL.getPostMap();
+                result.data.check_ids.forEach(function(post){
+                  var ele = postDomMap[post];
+                  // var ele = document.getElementById(post);
+                  IMPL.analyticsPost(ele,url,true,function(d){
+                    doPost(SERVER+"comment/report_check",
+                    {
+                      data:d
+                    });
+                  });
+                });
+              }
 
 
             }
