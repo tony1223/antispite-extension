@@ -31,6 +31,11 @@
       "js": [  "js/antispite-yahoo.js" ],
       "matches": [ "https://tw.news.yahoo.com/*"],
       "all_frames": true
+  },{
+      "css": [ ],
+      "js": [  "js/installed_remove.js" ],
+      "matches": [ "http://antispite.tonyq.org/*"],
+      "all_frames": true
   }],
   "background": {
       "scripts": ["js/background.js"],
